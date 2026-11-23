@@ -36,7 +36,9 @@ module.exports = {
             },
             {
                 test: /\.ts?$/,
-                use: 'ts-loader',
+                // transpileOnly: fresh installs pull newer @types that clash
+                // with this repo's TS 4.6; run `npx tsc --noEmit --skipLibCheck -p src` to typecheck
+                use: { loader: 'ts-loader', options: { transpileOnly: true } },
                 exclude: /node_modules/,
             },
             // JS

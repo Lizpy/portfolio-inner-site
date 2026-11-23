@@ -1,0 +1,25 @@
+{
+  "files": {
+    "main.css": "/os/static/css/main.a1b675f3.css",
+    "main.js": "/os/static/js/main.1ee98539.js",
+    "static/js/787.749b4a44.chunk.js": "/os/static/js/787.749b4a44.chunk.js",
+    "static/media/MSSansSerif.ttf": "/os/static/media/MSSansSerif.aa14e7b110864a3c2e08.ttf",
+    "static/media/withPet.jpg": "/os/static/media/withPet.ea3dee3b41ddedb0970b.jpg",
+    "static/media/funky.jpg": "/os/static/media/funky.a35edaf62d9d1afab894.jpg",
+    "static/media/presenting.jpg": "/os/static/media/presenting.e6d257cc6fa73dd6eaa7.jpg",
+    "static/media/ee.jpg": "/os/static/media/ee.7656e3a317181c8a39b1.jpg",
+    "static/media/Terminal.ttf": "/os/static/media/Terminal.6a1b7290048681921b2c.ttf",
+    "static/media/neverGiveUp.jpg": "/os/static/media/neverGiveUp.c9ee4e48677de77065a9.jpg",
+    "static/media/Vaibhav_Kumar_Resume.pdf": "/os/static/media/Vaibhav_Kumar_Resume.707f7304143782441163.pdf",
+    "static/media/Millennium.ttf": "/os/static/media/Millennium.e16d74a8e8e0567ce30e.ttf",
+    "static/media/Millennium-Bold.ttf": "/os/static/media/Millennium-Bold.cd5e3be832ebd008c852.ttf",
+    "index.html": "/os/index.html",
+    "main.a1b675f3.css.map": "/os/static/css/main.a1b675f3.css.map",
+    "main.1ee98539.js.map": "/os/static/js/main.1ee98539.js.map",
+    "787.749b4a44.chunk.js.map": "/os/static/js/787.749b4a44.chunk.js.map"
+  },
+  "entrypoints": [
+    "static/css/main.a1b675f3.css",
+    "static/js/main.1ee98539.js"
+  ]
+}

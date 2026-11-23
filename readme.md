@@ -1,29 +1,40 @@
-# henryheffernan.com
+# Vaibhav Kumar - Portfolio
 
-This is one of two repositories created for my portfolio website <a href="https://henryheffernan.com/"><samp>henryheffernan.com</samp></a>. If you are looking for the 2D OS repository you can find it <a href="https://github.com/henryjeff/portfolio-inner-site"><samp>here</samp></a>! Thanks for taking the time to check this out. If you have any questions of comments, feel free to shoot me an email at <samp><a href="mailto:henryheffernan@gmail.com">henryheffernan@gmail.com</a></samp> or you can DM me on twitter <a href="https://twitter.com/henryheffernan"><samp>@henryheffernan</samp></a>.
+My portfolio website: a Fedora-terminal boot screen that drops you straight into a retro 3D computer running my "VaibhavOS" showcase.
 
-<br>
+## Credits
 
-To setup a dev environment:
+This site is built on [Henry Heffernan](https://henryheffernan.com/)'s open-source portfolio, released under the MIT License (see `LICENSE.md`). The 3D scene, OS design and most of the engineering are his work, and huge thanks to him for open-sourcing it. The original repositories are:
 
-```bash
-# Clone the repository
+- 3D scene: https://github.com/henryjeff/portfolio-website
+- Inner OS site: https://github.com/henryjeff/portfolio-inner-site
 
-# Install dependencies 
-npm i
+## Project layout
 
-# Run the local dev server
-npm run dev
+```
+vk-resorces/
+├── portfolio-website/      3D desk scene + Fedora terminal landing page (this repo)
+│   └── static/os/          built copy of the inner OS site (loaded in the monitor iframe at /os/)
+└── portfolio-inner-site/   the OS + showcase pages (About, Experience, Projects, Contact)
 ```
 
-To serve a production build:
+## Build and run
 
 ```bash
-# Install dependencies if not already done - 'npi i'
-
-# Build for production
+# 1. Build the inner OS site (served at /os/)
+cd portfolio-inner-site
+npm install
 npm run build
 
-# Serve the build using express
-npm start
+# 2. Copy it into the 3D site's static folder
+rm -rf ../portfolio-website/static/os
+cp -r build ../portfolio-website/static/os
+
+# 3. Build and serve the 3D site
+cd ../portfolio-website
+npm install
+npm run build
+npm start            # http://localhost:8080
 ```
+
+To edit the content, change the files in `portfolio-inner-site/src/components/showcase/` and repeat steps 1-3.

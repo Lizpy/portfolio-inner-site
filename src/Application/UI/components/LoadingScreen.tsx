@@ -1,90 +1,77 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import eventBus from '../EventBus';
 
 type LoadingProps = {};
 
+/**
+ * Landing page: a Fedora-style terminal that "boots" the portfolio.
+ * It types a few commands, streams the real 3D asset loading as build
+ * output, then waits for any key / click / tap to enter the computer.
+ */
+
+type Seg = { text: string; color?: string; bold?: boolean };
+type Line = { id: number; segs: Seg[] };
+
+const C = {
+    bg: '#1d1d1d',
+    fg: '#deddda',
+    green: '#33d17a',
+    blue: '#62a0ea',
+    fedora: '#51a2da',
+    yellow: '#f6d32d',
+    red: '#ed333b',
+    dim: '#9a9996',
+    magenta: '#c061cb',
+};
+
+const USER = 'vaibhav';
+const HOST = 'fedora';
+
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
 const LoadingScreen: React.FC<LoadingProps> = () => {
-    const [progress, setProgress] = useState(0);
-    const [toLoad, setToLoad] = useState(0);
-    const [loaded, setLoaded] = useState(0);
+    const [lines, setLines] = useState<Line[]>([]);
+    const [typing, setTyping] = useState<string | null>(null);
+    const [ready, setReady] = useState(false);
     const [overlayOpacity, setLoadingOverlayOpacity] = useState(1);
-    const [loadingTextOpacity, setLoadingTextOpacity] = useState(1);
-    const [startPopupOpacity, setStartPopupOpacity] = useState(0);
-    const [firefoxPopupOpacity, setFirefoxPopupOpacity] = useState(0);
-    const [webGLErrorOpacity, setWebGLErrorOpacity] = useState(0);
-
-    const [showBiosInfo, setShowBiosInfo] = useState(false);
-    const [showLoadingResources, setShowLoadingResources] = useState(false);
-    const [doneLoading, setDoneLoading] = useState(false);
     const [webGLError, setWebGLError] = useState(false);
-    const [counter, setCounter] = useState(0);
-    const [resources] = useState<string[]>([]);
-    const [mobileWarning, setMobileWarning] = useState(window.innerWidth < 768);
+    const [mobileWarning, setMobileWarning] = useState(
+        window.innerWidth < 768
+    );
 
-    const onResize = () => {
-        if (window.innerWidth < 768) {
-            setMobileWarning(true);
-        } else {
-            setMobileWarning(false);
-        }
-    };
-
-    window.addEventListener('resize', onResize);
+    const loadedRef = useRef<string[]>([]);
+    const progressRef = useRef(0);
+    const totalRef = useRef(0);
+    const startedRef = useRef(false);
+    const idRef = useRef(0);
+    const scrollRef = useRef<HTMLDivElement>(null);
+    const cwdRef = useRef('~');
 
     useEffect(() => {
-        const urlParams = new URLSearchParams(window.location.search);
-        if (urlParams.has('debug')) {
-            start();
-        } else if (!detectWebGLContext()) {
-            setWebGLError(true);
-        } else {
-            setShowBiosInfo(true);
-        }
+        const onResize = () => setMobileWarning(window.innerWidth < 768);
+        window.addEventListener('resize', onResize);
+        return () => window.removeEventListener('resize', onResize);
     }, []);
 
+    // Collect real resource-loading events from the 3D app
     useEffect(() => {
         eventBus.on('loadedSource', (data) => {
-            setProgress(data.progress);
-            setToLoad(data.toLoad);
-            setLoaded(data.loaded);
-            resources.push(
-                `Loaded ${data.sourceName}${getSpace(
-                    data.sourceName
-                )} ... ${Math.round(data.progress * 100)}%`
-            );
-            if (resources.length > 8) {
-                resources.shift();
-            }
+            progressRef.current = data.progress;
+            totalRef.current = data.toLoad;
+            loadedRef.current.push(data.sourceName);
         });
     }, []);
 
+    // keep the terminal scrolled to the bottom
     useEffect(() => {
-        setShowLoadingResources(true);
-        setCounter(counter + 1);
-    }, [loaded]);
-
-    useEffect(() => {
-        if (progress >= 1 && !webGLError) {
-            setDoneLoading(true);
-
-            setTimeout(() => {
-                setLoadingTextOpacity(0);
-                setTimeout(() => {
-                    setStartPopupOpacity(1);
-                }, 500);
-            }, 1000);
+        if (scrollRef.current) {
+            scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
         }
-    }, [progress]);
-
-    useEffect(() => {
-        if (webGLError) {
-            setTimeout(() => {
-                setWebGLErrorOpacity(1);
-            }, 500);
-        }
-    }, [webGLError]);
+    }, [lines, typing, ready]);
 
     const start = useCallback(() => {
+        if (startedRef.current) return;
+        startedRef.current = true;
         setLoadingOverlayOpacity(0);
         eventBus.dispatch('loadingScreenDone', {});
         const ui = document.getElementById('ui');
@@ -93,36 +80,112 @@ const LoadingScreen: React.FC<LoadingProps> = () => {
         }
     }, []);
 
-    const getSpace = (sourceName: string) => {
-        let spaces = '';
-        for (let i = 0; i < 24 - sourceName.length; i++) spaces += '\xa0';
-        return spaces;
-    };
+    // "Press any key" -> enter
+    useEffect(() => {
+        if (!ready) return;
+        const go = () => start();
+        window.addEventListener('keydown', go);
+        window.addEventListener('mousedown', go);
+        window.addEventListener('touchstart', go);
+        return () => {
+            window.removeEventListener('keydown', go);
+            window.removeEventListener('mousedown', go);
+            window.removeEventListener('touchstart', go);
+        };
+    }, [ready, start]);
 
-    const getCurrentDate = () => {
-        const date = new Date();
-        const month = date.getMonth() + 1;
-        const day = date.getDate();
-        const year = date.getFullYear();
-        // add leading zero
-        const monthFormatted = month < 10 ? `0${month}` : month;
-        const dayFormatted = day < 10 ? `0${day}` : day;
-        return `${monthFormatted}/${dayFormatted}/${year}`;
-    };
-
-    const detectWebGLContext = () => {
-        var canvas = document.createElement('canvas');
-
-        // Get WebGLRenderingContext from canvas element.
-        var gl =
-            canvas.getContext('webgl') ||
-            canvas.getContext('experimental-webgl');
-        // Report the result.
-        if (gl && gl instanceof WebGLRenderingContext) {
-            return true;
+    // The terminal script
+    useEffect(() => {
+        const urlParams = new URLSearchParams(window.location.search);
+        if (urlParams.has('debug')) {
+            start();
+            return;
         }
-        return false;
-    };
+        if (!detectWebGLContext()) {
+            setWebGLError(true);
+            return;
+        }
+
+        let cancelled = false;
+
+        const push = (...segs: Seg[]) => {
+            if (cancelled) return;
+            idRef.current += 1;
+            const line = { id: idRef.current, segs };
+            setLines((prev) => [...prev, line]);
+        };
+        const out = async (segs: Seg[] | string, delay = 35) => {
+            push(...(typeof segs === 'string' ? [{ text: segs }] : segs));
+            await sleep(delay);
+        };
+        const cmd = async (text: string, pause = 350) => {
+            await sleep(pause);
+            for (let i = 0; i <= text.length; i++) {
+                if (cancelled) return;
+                setTyping(text.slice(0, i));
+                await sleep(Math.random() * 45 + 25);
+            }
+            await sleep(180);
+            setTyping(null);
+            push(...prompt(cwdRef.current), { text: text });
+        };
+
+        const run = async () => {
+            await out([{ text: `Last login: ${lastLogin()} on tty2`, color: C.dim }], 300);
+
+            // --- clone
+            await cmd('git clone https://github.com/lizpy/portfolio.git && cd portfolio');
+            await out("Cloning into 'portfolio'...", 120);
+            await out('remote: Enumerating objects: 2026, done.', 60);
+            await out('remote: Counting objects: 100% (2026/2026), done.', 60);
+            await out('Receiving objects: 100% (2026/2026), 13.37 MiB | 8.35 MiB/s, done.', 60);
+            await out('Resolving deltas: 100% (1403/1403), done.', 200);
+            cwdRef.current = '~/portfolio';
+
+            // --- build: stream the REAL asset loading
+            await cmd('npm run build:3d');
+            await out([{ text: '> vaibhav-portfolio@1.0.0 build:3d', color: C.dim }], 40);
+            await out([{ text: '> three --load ./static --render desk.glb', color: C.dim }], 200);
+            let printed = 0;
+            const t0 = performance.now();
+            while (!cancelled) {
+                const all = loadedRef.current;
+                if (printed < all.length) {
+                    const name = all[printed];
+                    printed++;
+                    const pct = Math.round(
+                        (printed / Math.max(totalRef.current, all.length)) * 100
+                    );
+                    await out(
+                        [
+                            { text: '  loaded ', color: C.dim },
+                            { text: pad(name, 26), color: C.blue },
+                            { text: `... ${pct}%`, color: C.dim },
+                        ],
+                        25
+                    );
+                } else if (progressRef.current >= 1) {
+                    break;
+                } else {
+                    await sleep(80);
+                }
+            }
+            const secs = ((performance.now() - t0) / 1000 + 0.42).toFixed(2);
+            await out([
+                { text: 'webpack compiled ', color: C.fg },
+                { text: 'successfully', color: C.green, bold: true },
+                { text: ` in ${secs}s`, color: C.fg },
+            ], 250);
+
+            if (!cancelled) setReady(true);
+        };
+
+        run();
+        return () => {
+            cancelled = true;
+        };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
 
     return (
         <div
@@ -131,154 +194,85 @@ const LoadingScreen: React.FC<LoadingProps> = () => {
                 transform: `scale(${overlayOpacity === 0 ? 1.1 : 1})`,
             })}
         >
-            {startPopupOpacity === 0 && loadingTextOpacity === 0 && (
-                <div style={styles.blinkingContainer}>
-                    <span className="blinking-cursor" />
-                </div>
-            )}
-            {!webGLError && (
-                <div
-                    style={Object.assign({}, styles.overlayText, {
-                        opacity: loadingTextOpacity,
-                    })}
-                >
-                    <div
-                        style={styles.header}
-                        className="loading-screen-header"
-                    >
-                        <div style={styles.logoContainer}>
-                            <div>
-                                <p style={styles.green}>
-                                    <b>Heffernan,</b>{' '}
-                                </p>
-                                <p style={styles.green}>
-                                    <b>Henry Inc.</b>
-                                </p>
-                            </div>
-                        </div>
-                        <div style={styles.headerInfo}>
-                            <p>Released: 01/13/2000</p>
-                            <p>HHBIOS (C)2000 Heffernan Henry Inc.,</p>
-                        </div>
-                    </div>
-                    <div style={styles.body} className="loading-screen-body">
-                        <p>HSP S13 2000-2022 Special UC131S</p>
-                        <div style={styles.spacer} />
-                        {showBiosInfo && (
-                            <>
-                                <p>HSP Showcase(tm) XX 113</p>
-                                <p>Checking RAM : {14000} OK</p>
-                                <div style={styles.spacer} />
-                                <div style={styles.spacer} />
-                                {showLoadingResources ? (
-                                    progress == 1 ? (
-                                        <p>FINISHED LOADING RESOURCES</p>
-                                    ) : (
-                                        <p className="loading">
-                                            LOADING RESOURCES ({loaded}/
-                                            {toLoad === 0 ? '-' : toLoad})
-                                        </p>
-                                    )
-                                ) : (
-                                    <p className="loading">WAIT</p>
-                                )}
-                            </>
-                        )}
-                        <div style={styles.spacer} />
-                        <div style={styles.resourcesLoadingList}>
-                            {resources.map((sourceName) => (
-                                <p key={sourceName}>{sourceName}</p>
+            {!webGLError ? (
+                <div style={styles.terminal} ref={scrollRef}>
+                    {lines.map((line) => (
+                        <div key={line.id} style={styles.line}>
+                            {line.segs.map((s, i) => (
+                                <span
+                                    key={i}
+                                    style={{
+                                        color: s.color || C.fg,
+                                        fontWeight: s.bold ? 700 : 400,
+                                    }}
+                                >
+                                    {s.text}
+                                </span>
                             ))}
                         </div>
-                        <div style={styles.spacer} />
-                        {showLoadingResources && doneLoading && (
-                            <p>
-                                All Content Loaded, launching{' '}
-                                <b style={styles.green}>
-                                    'Henry Heffernan Portfolio Showcase'
-                                </b>{' '}
-                                V1.0
-                            </p>
-                        )}
-                        <div style={styles.spacer} />
-                        <span className="blinking-cursor" />
-                    </div>
-                    <div
-                        style={styles.footer}
-                        className="loading-screen-footer"
-                    >
-                        <p>
-                            Press <b>DEL</b> to enter SETUP , <b>ESC</b> to skip
-                            memory test
-                        </p>
-                        <p>{getCurrentDate()}</p>
-                    </div>
-                </div>
-            )}
-            <div
-                style={Object.assign({}, styles.popupContainer, {
-                    opacity: startPopupOpacity,
-                })}
-            >
-                <div style={styles.startPopup}>
-                    {/* <p style={styles.red}>
-                        <b>THIS SITE IS CURRENTLY A W.I.P.</b>
-                    </p>
-                    <p>But do enjoy what I have done so far :)</p>
-                    <div style={styles.spacer} />
-                    <div style={styles.spacer} /> */}
-                    <p>Henry Heffernan Portfolio Showcase 2022</p>
-                    {mobileWarning && (
+                    ))}
+                    {typing !== null && (
+                        <div style={styles.line}>
+                            {prompt(cwdRef.current).map((s, i) => (
+                                <span
+                                    key={i}
+                                    style={{
+                                        color: s.color,
+                                        fontWeight: s.bold ? 700 : 400,
+                                    }}
+                                >
+                                    {s.text}
+                                </span>
+                            ))}
+                            <span style={{ color: C.fg }}>{typing}</span>
+                            <span style={styles.cursor} />
+                        </div>
+                    )}
+                    {ready && (
                         <>
-                            <br />
-                            <b>
-                                <p style={styles.warning}>
-                                    WARNING: This experience is best viewed on
-                                </p>
-                                <p style={styles.warning}>
-                                    a desktop or laptop computer.
-                                </p>
-                            </b>
-                            <br />
+                            {mobileWarning && (
+                                <div style={Object.assign({}, styles.line, { marginTop: 16 })}>
+                                    <span style={{ color: C.yellow, fontWeight: 700 }}>
+                                        WARNING: this experience is best viewed on a desktop or laptop.
+                                    </span>
+                                </div>
+                            )}
+                            <div style={Object.assign({}, styles.line, { marginTop: 16 })}>
+                                <span style={{ color: C.fg }}>
+                                    Press any key to continue...
+                                </span>
+                                <span
+                                    className="terminal-cursor"
+                                    style={styles.cursor}
+                                />
+                            </div>
                         </>
                     )}
-                    <div style={{ display: 'flex', alignItems: 'flex-end' }}>
-                        <p>Click start to begin{'\xa0'}</p>
-                        <span className="blinking-cursor" />
-                    </div>
-                    <div
-                        style={{
-                            display: 'flex',
-                            justifyContent: 'center',
-                            alignItems: 'center',
-                            marginTop: '16px',
-                        }}
-                    >
-                        <div className="bios-start-button" onClick={start}>
-                            <p>START</p>
+                    {typing === null && !ready && (
+                        <div style={styles.line}>
+                            <span className="terminal-cursor" style={styles.cursor} />
                         </div>
-                    </div>
+                    )}
                 </div>
-            </div>
-            {webGLError && (
-                <div
-                    style={Object.assign({}, styles.popupContainer, {
-                        opacity: webGLErrorOpacity,
-                    })}
-                >
-                    <div style={styles.startPopup}>
-                        <p>
-                            <b style={{ color: 'red' }}>CRITICAL ERROR:</b> No
-                            WebGL Detected
-                        </p>
-                        <div style={styles.spacer} />
-                        <div style={styles.spacer} />
-
-                        <p>WebGL is required to run this site.</p>
-                        <p>
-                            Please enable it or switch to a browser which
-                            supports WebGL
-                        </p>
+            ) : (
+                <div style={styles.terminal}>
+                    <div style={styles.line}>
+                        {prompt().map((s, i) => (
+                            <span key={i} style={{ color: s.color, fontWeight: 700 }}>
+                                {s.text}
+                            </span>
+                        ))}
+                        <span>./launch --showcase</span>
+                    </div>
+                    <div style={styles.line}>
+                        <span style={{ color: C.red, fontWeight: 700 }}>
+                            error:
+                        </span>
+                        <span> no WebGL context detected</span>
+                    </div>
+                    <div style={styles.line}>
+                        WebGL is required to run this site. Please enable it or
+                        switch to a browser which supports WebGL.
                     </div>
                 </div>
             )}
@@ -286,115 +280,64 @@ const LoadingScreen: React.FC<LoadingProps> = () => {
     );
 };
 
+const prompt = (cwd = '~/portfolio'): Seg[] => [
+    { text: `${USER}@${HOST}`, color: C.green, bold: true },
+    { text: ':', color: C.fg, bold: true },
+    { text: cwd, color: C.green, bold: true },
+    { text: '$ ', color: C.fg, bold: true },
+];
+
+const pad = (s: string, n: number) =>
+    s.length >= n ? s + ' ' : s + '\xa0'.repeat(n - s.length);
+
+const lastLogin = () => {
+    const d = new Date(Date.now() - 1000 * 60 * 60 * 7);
+    return d.toString().split(' GMT')[0];
+};
+
+const detectWebGLContext = () => {
+    const canvas = document.createElement('canvas');
+    const gl =
+        canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
+    return !!(gl && gl instanceof WebGLRenderingContext);
+};
+
 const styles: StyleSheetCSS = {
     overlay: {
-        backgroundColor: 'black',
+        backgroundColor: C.bg,
         width: '100%',
         height: '100%',
         display: 'flex',
         transition: 'opacity 0.2s, transform 0.2s',
-        MozTransition: 'opacity 0.2s, transform 0.2s',
-        WebkitTransition: 'opacity 0.2s, transform 0.2s',
-        OTransition: 'opacity 0.2s, transform 0.2s',
-        msTransition: 'opacity 0.2s, transform 0.2s',
-
         transitionTimingFunction: 'ease-in-out',
-        MozTransitionTimingFunction: 'ease-in-out',
-        WebkitTransitionTimingFunction: 'ease-in-out',
-        OTransitionTimingFunction: 'ease-in-out',
-        msTransitionTimingFunction: 'ease-in-out',
-
         boxSizing: 'border-box',
-        fontSize: 16,
-        letterSpacing: 0.8,
     },
-
-    spacer: {
-        height: 16,
-    },
-    header: {
-        width: '100%',
-        boxSizing: 'border-box',
-        display: 'flex',
-        flexDirection: 'row',
-    },
-    popupContainer: {
-        position: 'absolute',
-        top: 0,
-        left: 0,
+    terminal: {
         width: '100%',
         height: '100%',
-        display: 'flex',
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-    warning: {
-        color: 'yellow',
-    },
-    blinkingContainer: {
-        position: 'absolute',
-        top: 0,
-        left: 0,
-        width: '100%',
-        height: '100%',
-        display: 'flex',
+        overflow: 'hidden',
         boxSizing: 'border-box',
-        padding: 48,
+        padding: '12px 14px',
+        fontFamily:
+            "'Adwaita Mono', 'Source Code Pro', 'DejaVu Sans Mono', 'Liberation Mono', monospace",
+        fontSize: 15,
+        lineHeight: 1.45,
+        letterSpacing: 0,
+        color: C.fg,
+        textAlign: 'left',
     },
-    startPopup: {
-        backgroundColor: '#000',
-        padding: 24,
-        border: '7px solid #fff',
-        display: 'flex',
-        flexDirection: 'column',
-        justifyContent: 'center',
-        maxWidth: 500,
-        // alignItems: 'center',
+    line: {
+        display: 'block',
+        whiteSpace: 'pre-wrap',
+        wordBreak: 'break-all',
+        minHeight: '1.45em',
     },
-    headerInfo: {
-        marginLeft: 64,
-    },
-    red: {
-        color: '#00ff00',
-    },
-    link: {
-        // textDecoration: 'none',
-        color: '#4598ff',
-        cursor: 'pointer',
-    },
-    overlayText: {
-        width: '100%',
-        height: '100%',
-        display: 'flex',
-        flexDirection: 'column',
-        justifyContent: 'space-between',
-    },
-    body: {
-        flex: 1,
-        display: 'flex',
-        width: '100%',
-        boxSizing: 'border-box',
-        flexDirection: 'column',
-    },
-    logoContainer: {
-        display: 'flex',
-        flexDirection: 'row',
-    },
-    resourcesLoadingList: {
-        display: 'flex',
-        paddingLeft: 32,
-        paddingBottom: 32,
-        flexDirection: 'column',
-    },
-    logoImage: {
-        width: 64,
-        height: 42,
-        imageRendering: 'pixelated',
-        marginRight: 16,
-    },
-    footer: {
-        boxSizing: 'border-box',
-        width: '100%',
+    cursor: {
+        display: 'inline-block',
+        width: '0.6em',
+        height: '1.1em',
+        verticalAlign: 'text-bottom',
+        backgroundColor: C.fg,
     },
 };
 

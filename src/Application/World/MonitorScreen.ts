@@ -184,7 +184,8 @@ export default class MonitorScreen extends EventEmitter {
 
         // Set iframe attributes
         // PROD
-        iframe.src = 'https://os.henryheffernan.com/';
+        // Inner OS site is built into static/os (see portfolio-inner-site)
+        iframe.src = '/os/';
         /**
          * Use dev server is query params are present
          *
@@ -204,7 +205,7 @@ export default class MonitorScreen extends EventEmitter {
         iframe.className = 'jitter';
         iframe.id = 'computer-screen';
         iframe.frameBorder = '0';
-        iframe.title = 'HeffernanOS';
+        iframe.title = 'VaibhavOS';
 
         // Add iframe to container
         container.appendChild(iframe);

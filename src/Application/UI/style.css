@@ -183,3 +183,13 @@ br {
         padding-bottom: 32px;
     }
 }
+
+/* Fedora terminal landing page */
+.terminal-cursor {
+    animation: terminal-blink 1s steps(1) infinite;
+}
+@keyframes terminal-blink {
+    50% {
+        opacity: 0;
+    }
+}

@@ -182,8 +182,14 @@ export default class Camera extends EventEmitter {
     }
 
     setPostLoadTransition() {
+        // Skip the desk view: go straight into the monitor after the landing terminal
         UIEventBus.on('loadingScreenDone', () => {
-            this.transition(CameraKey.IDLE, 2500, TWEEN.Easing.Exponential.Out);
+            this.transition(
+                CameraKey.MONITOR,
+                2500,
+                BezierEasing(0.13, 0.99, 0, 1)
+            );
+            UIEventBus.dispatch('enterMonitor', {});
         });
     }
 
